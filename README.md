@@ -15,6 +15,6 @@ To do this exercise, you should draw on the code presented in the exercise, the 
 
 Make sure to comment your code as you go, ideally line-by-line, at the very least chunk by chunk. This will help you remember why you wrote your code the way you did, what the code was meant to do, and it will help you explain your code to the class. Clear, well-explained code is part of what is being assessed. 
 
-On top of writing the code, you need to *write out the interpretation of the analyses you ran%. At a minimum, this means a couple of lines per question.
+On top of writing the code, you need to *write out the interpretation of the analyses you ran*. At a minimum, this means a couple of lines per question.
 
 This is a formative assignment. It will be assessed by the lecturer.
