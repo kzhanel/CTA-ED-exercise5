@@ -18,6 +18,13 @@ You will learn how to:
 * Run some validation tests
 
 ## Setup 
+```{r}
+install.packages("topicmodels")
+install.packages("quanteda")
+install.packages("quanteda.textmodels")
+install.packages("ggthemes")
+install.packages("gutenbergr")
+```
 
 Before proceeding, we'll load the packages we will need for this tutorial.
 
@@ -38,8 +45,8 @@ library(quanteda.textmodels)
 You may need to install the preText package if you haven't done so yet. For that you will need to run the next code chunk (it is currently set to 'eval=F', which tells R 'do not execute this code chunk').
 That package is not readily available on through RStudio directly. It needs to be downloaded from the Github repository set up by its creater Matthew J Denny. We can do that using the command install_github(). This command is part of the 'devtools' package, which you will need to install as well (if you haven't done so already). The devtools package is directly available through R so it can be installed with the usual command install_packages. 
 
-```{r, message=F, eval=F}
-#install_package(devtools)
+```{r}
+install.packages(devtools)
 devtools::install_github("matthewjdenny/preText")
 library(preText)
 ```
@@ -58,7 +65,7 @@ This example is adapted by [Text Mining with R: A Tidy Approach](https://www.tid
 
 Here, we see that Volume of Tocqueville's "Democracy in America" is stored as "815". A separate search reveals that Volume 2 is stored as "816".
 
-```{r, eval=F}
+```{r}
 tocq <- gutenberg_download(c(815, 816), 
                             meta_fields = "author")
 ```
@@ -73,13 +80,12 @@ Once we have read in these data, we convert it into a different data shape: the 
 
 ```{r}
 tocq_words <- tocq %>%
-  mutate(booknumber = ifelse(gutenberg_id==815, "DiA1", "DiA2")) %>%
-  unnest_tokens(word, text) %>%
-  filter(!is.na(word)) %>%
+  mutate(booknumber = ifelse(gutenberg_id==815, "DiA1", "DiA2")) %>% ##mutate() creates new column in the  dataset
+  unnest_tokens(word, text) %>% ##splits column into tokens aka single words, here we're interested in words and texts (built-in options)
+  filter(!is.na(word)) %>% ##is.na indicated missing elements,filter retains the rows that satisfy the condition, ! expression means NOT -> filter by non-missing words
   count(booknumber, word, sort = TRUE) %>%
-  ungroup() %>%
-  anti_join(stop_words)
-
+  ungroup() %>% ##ungrouping the data
+  anti_join(stop_words) ##removinh stop words from dataset
 tocq_dtm <- tocq_words %>%
   cast_dtm(booknumber, word, n)
 
@@ -119,7 +125,7 @@ tocq_top_terms %>%
   geom_col(show.legend = FALSE) +
   facet_wrap(~ topic, scales = "free", ncol = 4) +
   scale_y_reordered() +
-  theme_tufte(base_family = "Helvetica")
+  theme_tufte(base_family = "Helvetica") ##adjusts the appearance of graph with Tufte's principles of effective data visualization, base_family means font
 
 ```
 
@@ -308,7 +314,7 @@ print(names(documents[1:10]))
 ```
 And now we are ready to preprocess in different ways. Here, we are including n-grams so we are preprocessing the text in 128 different ways. This takes about ten minutes to run on a machine with 8GB RAM. 
 
-```{r, eval = F}
+```{r}
 
 preprocessed_documents <- factorial_preprocessing(
     documents,
@@ -344,4 +350,196 @@ preText_score_plot(preText_results)
 
 1. Choose another book or set of books from Project Gutenberg
 2. Run your own topic model on these books, changing the k of topics, and evaluating accuracy.
+```{r}
+donhar <- gutenberg_download(c(53368, 35534), 
+                            meta_fields = "author") ##getting the dataframe
+```
+Once we have read in these data, we convert it into a different data shape: the document-term-matrix. We also create a new columns, which we call "booknumber" that recordss whether the term in question is from Volume 1 or Volume 2. To convert from tidy into "DocumentTermMatrix" format we can first use `unnest_tokens()` as we have done in past exercises, remove stop words, and then use the `cast_dtm()` function to convert into a "DocumentTermMatrix" object.
+```{r}
+donhar_words <- donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>% ##mutate() creates new column in the  dataset
+  unnest_tokens(word, text) %>% ##splits column into tokens aka single words, here we're interested in words and texts (built-in options)
+  filter(!is.na(word)) %>% ##is.na indicated missing elements,filter retains the rows that satisfy the condition, ! expression means NOT -> filter by non-missing words
+  count(author, word, sort = TRUE) %>%
+  ungroup() %>% ##ungrouping the data
+  anti_join(stop_words) ##removinh stop words from dataset
+donhar_dtm <- donhar_words %>%
+  cast_dtm(author, word, n)
+
+tm::inspect(donhar_dtm)
+```
+We see here that the data are now stored as a "DocumentTermMatrix." In this format, the matrix records the term (as equivalent of a column) and the document (as equivalent of row), and the number of times the term appears in the given document. Many terms will not appear in the document, meaning that the matrix will be stored as "sparse," meaning there will be a preponderance of zeroes. Here, since we are looking only at two documents that both come from a single volume set, the sparsity is relatively low (only 27%). In most applications, the sparsity will be a lot higher, approaching 99% or more.
+
+Estimating our topic model is then relatively simple. All we need to do if specify how many topics that we want to search for, and we can also set our seed, which is needed to reproduce the same results each time (as the model is a generative probabilistic one, meaning different random iterations will produce different results).
+```{r}
+donhar_lda <- LDA(donhar_dtm, k = 6, control = list(seed = 1234))
+```
+After this we can extract the per-topic-per-word probabilities, called "β" from the model:
+```{r}
+donhar_topics <- tidy(donhar_lda, matrix = "beta")
+
+head(donhar_topics, n = 10)
+```
+#wife has the highest prob of appearing/belonging to topic 4 (e-02 and the highest number)
+We now have data stored as one topic-per-term-per-row. The betas listed here represent the probability that the given term belongs to a given topic. So, here, we see that the term "democratic" is most likely to belong to topic 4. Strictly, this probability represents the probability that the term is generated from the topic in question.
+
+We can then plots the top terms, in terms of beta, for each topic as follows:
+```{r}
+donhar_top_terms <- donhar_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+donhar_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free", ncol = 4) +
+  scale_y_reordered() +
+  theme_tufte(base_family = "Helvetica")
+```
+But how do we actually evaluate these topics? Here, the topics all seem pretty similar. 
+
+## Evaluating topic model
+
+Well, one way to evaluate the performance of unspervised forms of classification is by testing our model on an outcome that is already known. 
+
+Here, two topics that are most obvious are the 'topics' Volume 1 and Volume 2 of Tocqueville's "Democracy in America." Volume 1 of Tocqueville's work deals more obviously with abstract constitutional ideas and questions of race; Volume 2 focuses on more esoteric aspects of American society. Listen an "In Our Time" episode with Melvyn Bragg discussing Democracy in America [here](https://www.bbc.co.uk/programmes/b09vyw0x).
+
+Given these differences in focus, we might think that a generative model could accurately assign to topic (i.e., Volume) with some accuracy.
+
+### Plot relative word frequencies
+
+First let's have a look and see whether there really are words obviously distinguishing the two Volumes. 
+```{r}
+tidy_donhar <- donhar %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+## Count most common words in both
+tidy_donhar %>%
+  count(word, sort = TRUE)
+
+bookfreq <- tidy_donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(author, word) %>%
+  group_by(author) %>%
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n) %>% 
+  spread(author, proportion)
+
+ggplot(bookfreq, aes(x = Donovan, y = Hardy, color = abs(Donovan - Hardy))) + ##absolute freq difference between Don and Har
+  geom_abline(color = "red", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "red") +
+  theme_tufte(base_family = "Helvetica") +
+  theme(legend.position="none", 
+        strip.background = element_blank(), 
+        strip.text.x = element_blank()) +
+  labs(x = "Donovan", y = "Hardy") +
+  coord_equal()
+```
+
+```{r}
+donhar <- donhar %>%
+  filter(!is.na(text))
+
+# Divide into documents, each representing one chapter
+donhar_chapter <- donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+  group_by(author) %>%
+  mutate(chapter = cumsum(str_detect(text, regex("^chapter ", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  filter(chapter > 0) %>%
+  unite(document, author, chapter)
+
+# Split into words
+donhar_chapter_word <- donhar_chapter %>%
+  unnest_tokens(word, text)
+
+# Find document-word counts
+donhar_word_counts <- donhar_chapter_word %>%
+  anti_join(stop_words) %>%
+  count(document, word, sort = TRUE) %>%
+  ungroup()
+
+donhar_word_counts
+
+# Cast into DTM format for LDA analysis
+
+donhar_chapters_dtm <- donhar_word_counts %>%
+  cast_dtm(document, word, n)
+
+tm::inspect(donhar_chapters_dtm)
+
+```
+```{r}
+donhar_chapters_lda <- LDA(donhar_chapters_dtm, k = 2, control = list(seed = 1234))
+```
+After this, it is worth looking at another output of the latent dirichlet allocation procedure. The γ probability represents the per-document-per-topic probability or, in other words, the probability that a given document (here: chapter) belongs to a particular topic (and here, we are assuming these topics represent volumes).
+
+The gamma values are therefore the estimated proportion of words within a given chapter allocated to a given volume. 
+
+```{r}
+
+donhar_chapters_gamma <- tidy(donhar_chapters_lda, matrix = "gamma")
+donhar_chapters_gamma
+
+```
+```{r}
+# First separate the document name into title and chapter
+
+donhar_chapters_gamma <- donhar_chapters_gamma %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE)
+
+donhar_chapter_classifications <- donhar_chapters_gamma %>%
+  group_by(title, chapter) %>%
+  top_n(1, gamma) %>%
+  ungroup()
+
+donhar_book_topics <- donhar_chapter_classifications %>%
+  count(title, topic) %>%
+  group_by(title) %>%
+  top_n(1, n) %>%
+  ungroup() %>%
+  transmute(consensus = title, topic)
+
+donhar_chapter_classifications %>%
+  inner_join(donhar_book_topics, by = "topic") %>%
+  filter(author != consensus)
+
+# Look document-word pairs were to see which words in each documents were assigned
+# to a given topic
+
+assignments_dh <- augment(donhar_chapters_lda, data = donhar_chapters_dtm)
+assignments
+
+assignments <- assignments %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE) %>%
+  inner_join(donhar_book_topics, by = c(".topic" = "topic"))
+
+assignments %>%
+  count(title, consensus, wt = count) %>%
+  group_by(title) %>%
+  mutate(percent = n / sum(n)) %>%
+  ggplot(aes(consensus, title, fill = percent)) +
+  geom_tile() +
+  scale_fill_gradient2(high = "red", label = percent_format()) +
+  geom_text(aes(x = consensus, y = title, label = scales::percent(percent))) +
+  theme_tufte(base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.grid = element_blank()) +
+  labs(x = "Book words assigned to",
+       y = "Book words came from",
+       fill = "% of assignments")
+
+```
+```
+
+
 3. Validate different pre-processing techniques using `preText` on the new book(s) of your choice. 
