@@ -87,9 +87,9 @@ tocq_words <- tocq %>%
   filter(!is.na(word)) %>% ##is.na indicated missing elements,filter retains the rows that satisfy the condition, ! expression means NOT -> filter by non-missing words
   count(booknumber, word, sort = TRUE) %>%
   ungroup() %>% ##ungrouping the data
-  anti_join(stop_words) ##removinh stop words from dataset
+  anti_join(stop_words) ##removing stop words from dataset
 tocq_dtm <- tocq_words %>%
-  cast_dtm(booknumber, word, n)
+  cast_dtm(booknumber, word, n) #cast_dtm creates a DTM (table where rows represent books and )
 
 tm::inspect(tocq_dtm)
 ```
