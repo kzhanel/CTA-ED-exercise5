@@ -38,7 +38,7 @@ library(quanteda.textmodels)
 You may need to install the preText package if you haven't done so yet. For that you will need to run the next code chunk (it is currently set to 'eval=F', which tells R 'do not execute this code chunk').
 That package is not readily available on through RStudio directly. It needs to be downloaded from the Github repository set up by its creater Matthew J Denny. We can do that using the command install_github(). This command is part of the 'devtools' package, which you will need to install as well (if you haven't done so already). The devtools package is directly available through R so it can be installed with the usual command install_packages. 
 
-```{r, message=F, eval=F}
+```{r, message=F}
 #install_package(devtools)
 devtools::install_github("matthewjdenny/preText")
 library(preText)
@@ -58,7 +58,7 @@ This example is adapted by [Text Mining with R: A Tidy Approach](https://www.tid
 
 Here, we see that Volume of Tocqueville's "Democracy in America" is stored as "815". A separate search reveals that Volume 2 is stored as "816".
 
-```{r, eval=F}
+```{r}
 #USING THIS DATA
 tocq <- gutenberg_download(c(815, 816), 
                             meta_fields = "author")
@@ -753,7 +753,7 @@ Donhar_book_topics <- Donhar_chapter_classifications %>%
   transmute(consensus = title, topic)
 
 Donhar_chapter_classifications %>%
-  inner_join(Keyhar_book_topics, by = "topic") %>%
+  inner_join(Donhar_book_topics, by = "topic") %>%
   filter(title != consensus)
 
 # Look document-word pairs were to see which words in each documents were assigned
@@ -972,7 +972,7 @@ assignments2 %>%
 # load in corpus of Tocequeville text data.
 corp2 <- corpus(bronte, text_field = "text")
 # use first 10 documents for example
-documents2 <- corp[sample(1:30000,1000)]
+documents2 <- corp[sample(1:3000,100)]
 # take a look at the document names
 print(names(documents2[1:10]))
 
