@@ -349,57 +349,62 @@ preText_score_plot(preText_results)
 
 ![](data/topicmodels/pretext_results.png){width=100%}
 
-## Exercises
+
+
+## --------------Exercises-------------------
+
+
 
 1. Choose another book or set of books from Project Gutenberg
 a. How to be Happy Though Married: Being a Handbook to Marriage by E. J. Hardy (35534), 1887 year, 260 pg
-b. Don't Marry; or, Advice on How, When and Who to Marry by James W. Donovan(53368),1890 year, 320 pg
-
-
+b. Love and Marriage, Ellen Key(57592),1911 year, 350 pg
+We chose these books because we wanted to examine a male author's perspective on marriage tips as compared to a female author's persepctive. These books were published around roughly the same time and cover similar themes.
 
 2. Run your own topic model on these books, changing the k of topics, and evaluating accuracy.
 
 ```{r}
 #ctrl + alt + i to add code chunk
 #load in the data
-donhar<- gutenberg_download(c(53368, 35534), 
+keyhar<- gutenberg_download(c(57592, 35534), 
                             meta_fields = "author")
 ```
 
 ```{r}
 #convert data to DTM, new column for which author, don or har
-donhar_words <- donhar %>%
-  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+keyhar_words <- keyhar %>%
+  mutate(author = ifelse(gutenberg_id==57592, "Key", "Hardy")) %>%
   unnest_tokens(word, text) %>%
   filter(!is.na(word)) %>%
   count(author, word, sort = TRUE) %>%
   ungroup() %>%
   anti_join(stop_words)
 
-donhar_dtm <- donhar_words %>%
+keyhar_dtm <- keyhar_words %>%
   cast_dtm(author, word, n)
 
-tm::inspect(donhar_dtm)
+tm::inspect(keyhar_dtm)
 ```
+2a) In the DTM we can see the difference in frequency for each word used by both Hardy and Key, with distinct differences being shown in terms like: love, wherein Key uses the word roughly 7x more than Hardy. The sparsity reflects the fact that we are looking at just two documents, as 36% is quite low compared to other data-frames which may have more missing values, this suggests our DTM is dense.
 ```{r}
 #estimating topic model
-donhar_lda <- LDA(donhar_dtm, k = 6, control = list(seed = 1234))
+keyhar_lda <- LDA(keyhar_dtm, k = 6, control = list(seed = 1234))
 
 #extract the beta (per topic per word prob)
-donhar_topics <- tidy(donhar_lda, matrix = "beta")
+keyhar_topics <- tidy(keyhar_lda, matrix = "beta")
 
-head(donhar_topics, n = 6)
-#The betas listed here represent the probability that the given term belongs to a given topic. So, here, we see that the term "wife" is most likely to belong to topic 4 
+head(keyhar_topics, n = 6)
+
 ```
+2b) The betas listed here represent the probability that the given term belongs to a given topic. So, here, we see that the term "love" is most likely to belong to topic 3 (b=.0238).
 ```{r}
 #plot the prob 
-donhar_top_terms <- donhar_topics %>%
+keyhar_top_terms <- keyhar_topics %>%
   group_by(topic) %>%
   top_n(10, beta) %>%
   ungroup() %>%
   arrange(topic, -beta)
 
-donhar_top_terms %>%
+keyhar_top_terms %>%
   mutate(term = reorder_within(term, beta, topic)) %>%
   ggplot(aes(beta, term, fill = factor(topic))) +
   geom_col(show.legend = FALSE) +
@@ -408,19 +413,21 @@ donhar_top_terms %>%
   theme_tufte(base_family = "Helvetica")
 
 ```
+2c) We divided the topics into 6 groups(k=6) this was because our data are smaller compared to the DiA data which used k=10. This is a visualization of the top terms in each topic ranked by their respective betas. We considered summarizing each topic by the words listed under them, but it we faced difficulty distinguishing some as their terms are too similar (could be because we picked books based on topic so it makes sense they will share many terms).
+
 ```{r}
 #relative word frequencies
 
-tidy_donhar <- donhar %>%
+tidy_keyhar <- keyhar %>%
   unnest_tokens(word, text) %>%
   anti_join(stop_words)
 
 # Count most common words in both
-tidy_donhar %>%
+tidy_keyhar %>%
   count(word, sort = TRUE)
 
-bookfreq <- tidy_donhar %>%
-  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+bookfreq <- tidy_keyhar %>%
+  mutate(author = ifelse(gutenberg_id==57592, "Key", "Hardy")) %>%
   mutate(word = str_extract(word, "[a-z']+")) %>%
   count(author, word) %>%
   group_by(author) %>%
@@ -428,7 +435,7 @@ bookfreq <- tidy_donhar %>%
   select(-n) %>% 
   spread(author, proportion)
 
-ggplot(bookfreq, aes(x = Donovan, y = Hardy, color = abs(Donovan - Hardy))) + #absolute difference in frequency between Donovan and hardy
+ggplot(bookfreq, aes(x = Key, y = Hardy, color = abs(Key - Hardy))) + #absolute difference in frequency between Key and hardy
   geom_abline(color = "black", lty = 2) +
   geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
   geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
@@ -439,18 +446,20 @@ ggplot(bookfreq, aes(x = Donovan, y = Hardy, color = abs(Donovan - Hardy))) + #a
   theme(legend.position="none", 
         strip.background = element_blank(), 
         strip.text.x = element_blank()) +
-  labs(x = "Donovan", y = "Hardy") +
+  labs(x = "Key", y = "Hardy") +
   coord_equal()
 
 ```
+2d) This frequency graph looks at the words most used in Key's writing versus Hardy's. Terms like "Blood" which is bright red and on Key's side of the graph indicates that the termis used more frequently in Key's writing and because of the color suggests she uses it a lot more frequently. Note: Red = high abs value between word usage, Green = low abs value between word usage, Grey = middle ground between usage, like if one uses a word slightly more often than the other??? 
+
 ```{r}
 #split into chapters
-donhar <- donhar %>%
+keyhar <- keyhar %>%
   filter(!is.na(text))
 
 # Divide into documents, each representing one chapter
-donhar_chapter <- donhar %>%
-  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+keyhar_chapter <- keyhar %>%
+  mutate(author = ifelse(gutenberg_id==57592, "Key", "Hardy")) %>%
   group_by(author) %>%
   mutate(chapter = cumsum(str_detect(text, regex("^chapter ", ignore_case = TRUE)))) %>%
   ungroup() %>%
@@ -458,67 +467,72 @@ donhar_chapter <- donhar %>%
   unite(document, author, chapter)
 
 # Split into words
-donhar_chapter_word <- donhar_chapter %>%
+keyhar_chapter_word <- keyhar_chapter %>%
   unnest_tokens(word, text)
 
 # Find document-word count
-donhar_word_counts <- donhar_chapter_word %>%
+keyhar_word_counts <- keyhar_chapter_word %>%
   anti_join(stop_words) %>%
   count(document, word, sort = TRUE) %>%
   ungroup()
 
-donhar_word_counts
+keyhar_word_counts
 
 # Cast into DTM format for LDA analysis
 
-donhar_chapters_dtm <- donhar_word_counts %>%
+keyhar_chapters_dtm <- keyhar_word_counts %>%
   cast_dtm(document, word, n)
 
-tm::inspect(donhar_chapters_dtm)
+tm::inspect(keyhar_chapters_dtm)
+
 
 ```
+2e) When splitting by chapters, our sparsity jumps from 36% to 92%, which just affirms that we do have many values categorized as 0 in this DTM. Can we have an explanation her, donhar returned different results?
+
 ```{r}
 #restimate topic model with new dtm k=2, 
-donhar_chapters_lda <- LDA(donhar_chapters_dtm, k = 2, control = list(seed = 1234))
+keyhar_chapters_lda <- LDA(keyhar_chapters_dtm, k = 2, control = list(seed = 1234))
 
 #gamma val estimates
-donhar_chapters_gamma <- tidy(donhar_chapters_lda, matrix = "gamma")
-donhar_chapters_gamma
+keyhar_chapters_gamma <- tidy(keyhar_chapters_lda, matrix = "gamma")
+keyhar_chapters_gamma
 
 ```
+2f) The gamma values returned here show us the estimated proportion of words within a given chapter allocated to a given author. This means that within topic 1, key_8 , which we think is chapter 8 of key's writing demonstrates the highest proportion of words that are likely to be allocated to key. Key_8 is most domonstrative of Key's writing.
+
 ```{r}
-#supervised learning distinguish models
-# First separate the document name into title and chapter
-donhar_chapters_gamma <- donhar_chapters_gamma %>%
+#unsupervised learning distinguish models
+#first separate the document name into title and chapter
+keyhar_chapters_gamma <- keyhar_chapters_gamma %>%
   separate(document, c("title", "chapter"), sep = "_", convert = TRUE)
 
-donhar_chapter_classifications <- donhar_chapters_gamma %>%
+keyhar_chapter_classifications <- keyhar_chapters_gamma %>%
   group_by(title, chapter) %>%
   top_n(1, gamma) %>%
   ungroup()
 
-donhar_book_topics <- donhar_chapter_classifications %>%
+keyhar_book_topics <- keyhar_chapter_classifications %>%
   count(title, topic) %>%
   group_by(title) %>%
   top_n(1, n) %>%
   ungroup() %>%
   transmute(consensus = title, topic)
 
-donhar_chapter_classifications %>%
-  inner_join(donhar_book_topics, by = "topic") %>%
+keyhar_chapter_classifications %>%
+  inner_join(keyhar_book_topics, by = "topic") %>%
   filter(title != consensus)
 
 # Look document-word pairs were to see which words in each documents were assigned
 # to a given topic
 
-assignments_dh <- augment(donhar_chapters_lda, data = donhar_chapters_dtm)
-assignments_dh
+assignments_kh <- augment(keyhar_chapters_lda, data = keyhar_chapters_dtm)
+assignments_kh
 
-assignments_dh <- assignments_dh %>%
+assignments_kh <- assignments_kh %>%
   separate(document, c("title", "chapter"), sep = "_", convert = TRUE) %>%
-  inner_join(donhar_book_topics, by = c(".topic" = "topic"))
+  inner_join(keyhar_book_topics, by = c(".topic" = "topic"))
 
-assignments %>%
+assignments_kh %>%
   count(title, consensus, wt = count) %>%
   group_by(title) %>%
   mutate(percent = n / sum(n)) %>%
@@ -534,7 +548,454 @@ assignments %>%
        fill = "% of assignments")
 
 ```
-
+2g) After running the unsupervised learning model We see that the model estimated with accuracy 92.5% of the words in Hardy's writing and and 100% of words in Key. This model is promising as it shows us that it will preform well if we were to give it some more unseen text from Hardy, and it would be able to categorize it as his work. However, the 100% success rate in Key's writing may show that the model is overfit and has merely learned the data; this would mean it is not going to be able to successfully categorize Key's writing as her own if we were to show it an unseen sample.
 
 
 3. Validate different pre-processing techniques using `preText` on the new book(s) of your choice. 
+
+```{r}
+#reformat text into quanteda corpus 
+# load in corpus of keyhar text data.
+corp <- corpus(keyhar, text_field = "text")
+# use first 10 documents for example
+documents <- corp[sample(1:3000,100)]
+# take a look at the document names
+print(names(documents[1:10]))
+
+```
+
+```{r, eval = F}
+#n-gram preprocessing
+preprocessed_documents <- factorial_preprocessing(
+    documents,
+    use_ngrams = TRUE,
+    infrequent_term_threshold = 0.2, #the frequency of different words in the documents less than 20%
+    verbose = FALSE)
+
+```
+
+```{r, eval = F}
+#results of preprocessing
+preText_results <- preText(
+    preprocessed_documents,
+    dataset_name = "Keyhar text",
+    distance_method = "cosine",
+    num_comparisons = 20,
+    verbose = FALSE)
+
+```
+
+```{r, eval = F}
+#plot the results 
+preText_score_plot(preText_results)
+```
+3) This plot of the preText Score results compares the distance between documents that have been processed in 128 different ways. We set the threshold at .2 which means any terms with less than 20% frequency were removed. The higher the preText score, the higher the similarity between the corpus objects, we think that our preText score is consitently positive due to the texts having similar themes.
+
+##-----------------Donovan and Hardy (first attempt, issue with accuracy) ---------------------- 
+```{r}
+
+#get the two books
+Donhar <- gutenberg_download(c(53368,35534), 
+                            meta_fields = "author")
+Donhar
+#prepare the document
+Donhar_words <- Donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+  unnest_tokens(word, text) %>%
+  filter(!is.na(word)) %>%
+  count(author, word, sort = TRUE) %>%
+  ungroup() %>%
+  anti_join(stop_words)
+Donhar_words
+
+#turn it into a document term matrix
+Donhar_dtm <- Donhar_words %>%
+  cast_dtm(author, word, n)
+
+tm::inspect(Donhar_dtm)
+
+```
+
+```{r}
+#specify how many topics are there
+Donhar_lda <- LDA(Donhar_dtm, k = 6, control = list(seed = 1234))
+
+#extra the per-word-per-topic probabilities
+Donhar_topics <- tidy(Donhar_lda, matrix = "beta")
+
+head(Donhar_topics, n = 6)
+##so the term "wife" is most likely to belong to topic 4
+
+#plot the results
+Donhar_top_terms <- Donhar_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+Donhar_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free", ncol = 3) +
+  scale_y_reordered() +
+  theme_tufte(base_family = "Helvetica")
+```
+
+```{r}
+
+##have a look at whether there are specific word that can distinguish the two books
+tidy_Donhar <- Donhar %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+## Count most common words in both
+tidy_Donhar %>%
+  count(word, sort = TRUE)
+
+bookfreq3 <- tidy_Donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(author, word) %>%
+  group_by(author) %>%
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n) %>% 
+  spread(author, proportion)
+head(bookfreq3)
+
+ggplot(bookfreq3, aes(x = Donovan, y = Hardy, color = abs(Donovan - Hardy))) +
+  geom_abline(color = "orange", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "purple") +
+  theme_tufte(base_family = "Helvetica") +
+  theme(legend.position="none", 
+        strip.background = element_blank(), 
+        strip.text.x = element_blank()) +
+  labs(x = "Donovan", y = "Hardy") +
+  coord_equal()
+
+
+```
+
+
+```{r}
+##split into chapter
+Donhar <- Donhar %>%
+  filter(!is.na(text))
+Donhar
+#it can't be clear as some NAs stay in the dataset
+
+
+# Divide into documents, each representing one chapter
+Donhar_chapter <- Donhar %>%
+  mutate(author = ifelse(gutenberg_id==53368, "Donovan", "Hardy")) %>%
+  group_by(author) %>%
+  mutate(chapter = cumsum(str_detect(text, regex("^chapter ", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  filter(chapter > 0) %>%
+  unite(document, author, chapter)
+Donhar_chapter
+
+# Split into words
+Donhar_chapter_word <- Donhar_chapter %>%
+  unnest_tokens(word, text)
+Donhar_chapter_word
+
+# Find document-word counts
+Donhar_word_counts <- Donhar_chapter_word %>%
+  anti_join(stop_words) %>%
+  count(document, word, sort = TRUE) %>%
+  ungroup()
+
+Donhar_word_counts
+
+
+
+# Cast into DTM format for LDA analysis
+
+Donhar_chapters_dtm <- Donhar_word_counts %>%
+  cast_dtm(document, word, n)
+
+tm::inspect(Donhar_chapters_dtm)
+##no Key data are shown in the chart, maybe cuz the Key data is too small compared to the hardy data
+
+#
+Donhar_chapters_lda <- LDA(Donhar_chapters_dtm, k = 2, control = list(seed = 1234))
+
+
+#
+Donhar_chapters_gamma <- tidy(Donhar_chapters_lda, matrix = "gamma")
+
+Donhar_chapters_gamma
+
+```
+
+```{r}
+#
+# First separate the document name into title and chapter
+
+Donhar_chapters_gamma <- Donhar_chapters_gamma %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE)
+
+Donhar_chapter_classifications <- Donhar_chapters_gamma %>%
+  group_by(title, chapter) %>%
+  top_n(1, gamma) %>%
+  ungroup()
+
+Donhar_book_topics <- Donhar_chapter_classifications %>%
+  count(title, topic) %>%
+  group_by(title) %>%
+  top_n(1, n) %>%
+  ungroup() %>%
+  transmute(consensus = title, topic)
+
+Donhar_chapter_classifications %>%
+  inner_join(Keyhar_book_topics, by = "topic") %>%
+  filter(title != consensus)
+
+# Look document-word pairs were to see which words in each documents were assigned
+# to a given topic
+
+assignments3 <- augment(Donhar_chapters_lda, data = Donhar_chapters_dtm)
+assignments3
+
+assignments3 <- assignments3 %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE) %>%
+  inner_join(Donhar_book_topics, by = c(".topic" = "topic"))
+
+assignments3 %>%
+  count(title, consensus, wt = count) %>%
+  group_by(title) %>%
+  mutate(percent = n / sum(n)) %>%
+  ggplot(aes(consensus, title, fill = percent)) +
+  geom_tile() +
+  scale_fill_gradient2(high = "red", label = percent_format()) +
+  geom_text(aes(x = consensus, y = title, label = scales::percent(percent))) +
+  theme_tufte(base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.grid = element_blank()) +
+  labs(x = "Book words assigned to",
+       y = "Book words came from",
+       fill = "% of assignments")
+
+
+
+
+```
+
+
+
+##------------BRONTES (first issue with accuracy fixed, but this accuracy model performs poorly, overtuning)----------------
+
+##wondering whether the problem is the samples are too short, use the Bromtes works as samples.
+```{r}
+
+#get the two books
+bronte <- gutenberg_download(c(768,1260), 
+                            meta_fields = "author")
+
+#prepare the document
+bronte_words <- bronte %>%
+  mutate(author = ifelse(gutenberg_id==768, "Emily", "Charlotte")) %>%
+  unnest_tokens(word, text) %>%
+  filter(!is.na(word)) %>%
+  count(author, word, sort = TRUE) %>%
+  ungroup() %>%
+  anti_join(stop_words)
+
+#turn it into a document term matrix
+bronte_dtm <- bronte_words %>%
+  cast_dtm(author, word, n)
+
+tm::inspect(bronte_dtm)
+
+
+#specify how many topics are there
+bronte_lda <- LDA(bronte_dtm, k = 6, control = list(seed = 1234))
+
+#extra the per-word-per-topic probabilities
+bronte_topics <- tidy(bronte_lda, matrix = "beta")
+
+head(bronte_topics, n = 6)
+#it's interesting that the first word always seems to belong to the fourth chapter!
+
+#plot the results
+bronte_top_terms <- bronte_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+bronte_top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(beta, term, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free", ncol = 3) +
+  scale_y_reordered() +
+  theme_tufte(base_family = "Helvetica")
+
+
+##have a look at whether there are specific word that can distinguish the two books
+tidy_bronte <- bronte %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stop_words)
+
+## Count most common words in both
+tidy_bronte %>%
+  count(word, sort = TRUE)
+
+bookfreq2 <- tidy_bronte %>%
+  mutate(author = ifelse(gutenberg_id==768, "Emily", "Charlotte")) %>%
+  mutate(word = str_extract(word, "[a-z']+")) %>%
+  count(author, word) %>%
+  group_by(author) %>%
+  mutate(proportion = n / sum(n)) %>% 
+  select(-n) %>% 
+  spread(author, proportion)
+head(bookfreq2)
+
+ggplot(bookfreq2, aes(x = Emily, y = Charlotte, color = abs(Emily - Charlotte))) +
+  geom_abline(color = "orange", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "purple") +
+  theme_tufte(base_family = "Helvetica") +
+  theme(legend.position="none", 
+        strip.background = element_blank(), 
+        strip.text.x = element_blank()) +
+  labs(x = "Emily", y = "Charlotte") +
+  coord_equal()
+
+
+
+
+
+##split into chapter
+bronte <- bronte %>%
+  filter(!is.na(text))
+
+# Divide into documents, each representing one chapter
+bronte_chapter <- bronte %>%
+  mutate(author = ifelse(gutenberg_id==768, "Emily", "Charlotte")) %>%
+  group_by(author) %>%
+  mutate(chapter = cumsum(str_detect(text, regex("^chapter ", ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  filter(chapter > 0) %>%
+  unite(document, author, chapter)
+
+# Split into words
+bronte_chapter_word <- bronte_chapter %>%
+  unnest_tokens(word, text)
+
+# Find document-word counts
+bronte_word_counts <- bronte_chapter_word %>%
+  anti_join(stop_words) %>%
+  count(document, word, sort = TRUE) %>%
+  ungroup()
+
+bronte_word_counts
+
+
+
+# Cast into DTM format for LDA analysis
+
+bronte_chapters_dtm <- bronte_word_counts %>%
+  cast_dtm(document, word, n)
+
+tm::inspect(bronte_chapters_dtm)
+
+#re-estimate the topic model with this DTM object
+bronte_chapters_lda <- LDA(bronte_chapters_dtm, k = 2, control = list(seed = 1234))
+
+
+#get the gamma value--the estimated proportion of words within a given chapter allocated to a given volume
+bronte_chapters_gamma <- tidy(bronte_chapters_lda, matrix = "gamma")
+bronte_chapters_gamma
+## not quite understand how it works
+
+
+
+# First separate the document name into title and chapter
+
+bronte_chapters_gamma <- bronte_chapters_gamma %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE)
+
+bronte_chapter_classifications <- bronte_chapters_gamma %>%
+  group_by(title, chapter) %>%
+  top_n(1, gamma) %>%
+  ungroup()
+
+bronte_book_topics <- bronte_chapter_classifications %>%
+  count(title, topic) %>%
+  group_by(title) %>%
+  top_n(1, n) %>%
+  ungroup() %>%
+  transmute(consensus = title, topic)
+
+bronte_chapter_classifications %>%
+  inner_join(bronte_book_topics, by = "topic") %>%
+  filter(title != consensus)
+
+# Look document-word pairs were to see which words in each documents were assigned to a given topic
+
+assignments2 <- augment(bronte_chapters_lda, data = bronte_chapters_dtm)
+assignments2
+
+assignments2 <- assignments2 %>%
+  separate(document, c("title", "chapter"), sep = "_", convert = TRUE) %>%
+  inner_join(bronte_book_topics, by = c(".topic" = "topic"))
+
+assignments2 %>%
+  count(title, consensus, wt = count) %>%
+  group_by(title) %>%
+  mutate(percent = n / sum(n)) %>%
+  ggplot(aes(consensus, title, fill = percent)) +
+  geom_tile() +
+  scale_fill_gradient2(high = "red", label = percent_format()) +
+  geom_text(aes(x = consensus, y = title, label = scales::percent(percent))) +
+  theme_tufte(base_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.grid = element_blank()) +
+  labs(x = "Book words assigned to",
+       y = "Book words came from",
+       fill = "% of assignments")
+
+```
+##reformat the data into a "quanteda" corpus object
+```{r}
+
+# load in corpus of Tocequeville text data.
+corp2 <- corpus(bronte, text_field = "text")
+# use first 10 documents for example
+documents2 <- corp[sample(1:30000,1000)]
+# take a look at the document names
+print(names(documents2[1:10]))
+
+
+#preprocessing the data in 128 different ways
+preprocessed_documents2 <- factorial_preprocessing(
+    documents2,
+    use_ngrams = TRUE,
+    infrequent_term_threshold = 0.2,
+    verbose = FALSE)
+
+
+#compare the distance between documents that have been processed in different ways
+preText_results2 <- preText(
+    preprocessed_documents2,
+    dataset_name = "Bronte text",
+    distance_method = "cosine",
+    num_comparisons = 20,
+    verbose = FALSE)
+
+
+#plot accordingly
+preText_score_plot(preText_results2)
+
+
+
